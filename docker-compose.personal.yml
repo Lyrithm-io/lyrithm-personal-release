@@ -1,0 +1,99 @@
+﻿# =====================================================================
+# Lyrithm Personal Edition - Docker Compose stack
+# =====================================================================
+# Three services, single-tenant, bound to localhost by default.
+# No Clerk, no Stripe. The signed license.json mounted into the engine
+# is the credential.
+# =====================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: lyrithm-personal-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-lyrithm}
+      POSTGRES_USER: ${DB_USER:-lyrithm}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required - see .env.personal.example}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-lyrithm} -d ${DB_NAME:-lyrithm}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  engine:
+    image: ghcr.io/${GHCR_OWNER:-lyrithm-io}/lyrithm-personal:${LYRITHM_VERSION:-1.0.3}
+    container_name: lyrithm-personal-engine
+    restart: unless-stopped
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./license.json:/etc/lyrithm/license.json:ro
+      - lyrithm_data:/var/lib/lyrithm
+      - ./strategies:/app/strategies:ro
+    environment:
+      - TZ=UTC
+      - JAVA_OPTS=-Xmx384m -Djava.net.preferIPv4Stack=true
+
+      - LYRITHM_EDITION=personal
+      - LYRITHM_LICENSE_FILE=/etc/lyrithm/license.json
+      - LYRITHM_ACTIVATED_FLAG=/var/lib/lyrithm/activated.flag
+      - LYRITHM_STRATEGY_CACHE_DIR=/var/lib/lyrithm/strategies
+      - LYRITHM_ACTIVATION_API_URL=${LYRITHM_ACTIVATION_API_URL:-https://api.lyrithm.io}
+      - LYRITHM_OBSERVATORY_API_URL=${LYRITHM_OBSERVATORY_API_URL:-https://api.lyrithm.io}
+
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=${DB_NAME:-lyrithm}
+      - DB_USER=${DB_USER:-lyrithm}
+      - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required}
+
+      - WEB_BIND_ADDRESS=0.0.0.0
+      - WEB_PORT=8080
+
+      - LYRITHM_MASTER_KEY=${LYRITHM_MASTER_KEY:?LYRITHM_MASTER_KEY required - see .env.personal.example}
+
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-0}
+
+      - LYRITHM_CREDENTIALS_FROM_DB=true
+      - INSTANCES_FROM_DB=true
+
+      - RISK_PER_TRADE=${RISK_PER_TRADE:-100}
+      - MAX_DAILY_LOSS=${MAX_DAILY_LOSS:-300}
+
+      - CLERK_JWT_ENABLED=false
+      - STRIPE_ENABLED=false
+      - STRATEGY_UPLOAD_ENABLED=false
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://127.0.0.1:8080/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  dashboard:
+    image: ghcr.io/${GHCR_OWNER:-lyrithm-io}/lyrithm-dashboard-personal:${LYRITHM_VERSION:-1.0.3}
+    container_name: lyrithm-personal-dashboard
+    restart: unless-stopped
+    depends_on:
+      engine:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      - LYRITHM_BACKEND_URL=http://engine:8080
+      - NEXT_PUBLIC_LYRITHM_EDITION=personal
+      - LYRITHM_EDITION=personal
+
+volumes:
+  postgres_data:
+  lyrithm_data:

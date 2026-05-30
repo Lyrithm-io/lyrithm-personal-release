@@ -1,0 +1,50 @@
+﻿name: Bug report
+description: Report a reproducible Lyrithm Personal issue
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Do not paste secrets: no license.json, .env, exchange keys, Telegram token, or private balances.
+  - type: input
+    id: version
+    attributes:
+      label: Image tag
+      description: Example: 1.0.3
+      placeholder: "1.0.3"
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: OS / VPS provider / Docker version
+      placeholder: "Ubuntu 24.04 on Vultr, Docker 26"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: What did you do?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Paste relevant logs with secrets removed.
+      render: text

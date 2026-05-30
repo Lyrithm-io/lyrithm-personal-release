@@ -1,0 +1,18 @@
+﻿# Local buyer secrets
+.env
+license.json
+*.license.json
+
+# Runtime data / backups
+/data/
+/postgres_data/
+/strategies/
+*.sql
+*.dump
+*.backup
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
