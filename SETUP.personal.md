@@ -49,11 +49,14 @@ DB_PASSWORD=<a long random password>
 LYRITHM_MASTER_KEY=<output of: openssl rand -base64 32>
 ```
 
-Optional Telegram alerts:
+Optional Telegram alerts route through the hosted Lyrithm Pulse relay by default - the Personal binary itself does not ship a Telegram bot token. After Step 4 below you will bind the official `@lyrithm_pulse_bot` to your chat from the dashboard Settings page. The relay endpoint is preconfigured to `https://api.lyrithm.io` and authenticated by your license id; the bound chat ID never leaves the Lyrithm cloud relay.
+
+If you want offline-only Telegram alerts via your own bot identity (no relay round-trip), uncomment and fill these instead - it disables the relay path:
 
 ```bash
-TELEGRAM_BOT_TOKEN=...
-TELEGRAM_CHAT_ID=...
+# TELEGRAM_BOT_TOKEN=...
+# TELEGRAM_CHAT_ID=...
+# LYRITHM_PULSE_ENABLED=false
 ```
 
 ## Step 3 - First Boot
@@ -86,6 +89,12 @@ Trading engine started in IDLE mode - no accounts will be subscribed.
 ```
 
 The bot intentionally boots in IDLE so you can wire your first exchange account from the dashboard before any real subscription happens. Telegram alerts (if configured) will fire on activation success.
+
+### Pulse alert quick-action buttons - known limitation
+
+Alert messages delivered through the hosted Lyrithm Pulse relay (the default Personal path) carry inline keyboard buttons such as `[Close]`, `[Reload]`, `[Info]`, and `[Retry]`. These buttons are **rendered but not yet wired** for Personal Edition in v1.0.4: tapping them does not execute the action because the callback round-trip back to your local engine is not implemented in Stage-0 of the relay. Alerts themselves deliver fine; only the one-tap buttons are decorative for now.
+
+Use the dashboard or the bot's main menu (`/menu` slash command or the `Menu` reply-keyboard tile) to act on alerts in the meantime. Stage-1 of the Pulse relay (v1.1+) adds the bidirectional channel that makes these buttons interactive.
 
 If activation is temporarily unreachable, the engine enters offline grace mode (14 days); see Troubleshooting.
 

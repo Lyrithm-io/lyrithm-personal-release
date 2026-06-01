@@ -41,6 +41,11 @@ Smoke path: pull images without docker login → compose up → all four contain
 
 Bot-side smoke: pair `@lyrithm_pulse_bot` from the dashboard Settings page → `/start <token>` deep-link from Telegram → bot replies `✨ Lyrithm Pulse connected.` → tap `🤖 Menu` reply-keyboard tile → inline Main menu renders with account list + global actions → tap an account → per-account inline keyboard renders → tap `❌ Close` → two-step confirm screen renders before any market order fires.
 
+### Known limitations
+
+- **Alert quick-action buttons are rendered but not yet interactive on Personal Edition.** Pulse-routed alerts include inline keyboards such as `[Close][Info]`, `[Reload][Info]`, and `[Retry]`. Tapping them is silently dropped today because the callback round-trip from Telegram → Cloud relay → buyer's local engine is not implemented in Stage-0 of the relay (Cloud's bot polling cannot reach back into your VPS). Alerts deliver normally; only the one-tap buttons are decorative. Use the bot's main menu (slash `/menu` or the `🤖 Menu` reply-keyboard tile) or the dashboard to act on alerts. Stage-1 of the relay (v1.1+) adds the bidirectional channel that wires these buttons.
+- **Telegram Mini App is not available for Personal Edition in v1.0.** The Mini App at `m.lyrithm.io` (planned for v1.0 Cloud) cannot reach a buyer's self-hosted engine — Personal engines run behind NAT / residential IPs and the Cloud Mini App URL is global. Personal buyers continue to use the local dashboard (over SSH tunnel for now) and the Telegram bot for alerts. Mini App parity for Personal Edition is planned for v1.2 once the Stage-1 bidirectional relay is in place.
+
 ### Recommended upgrade
 
 If you are on v1.0.3 and hit any of the clean-VPS workarounds (license permission, nginx proxy, manual `application.yml` mount, DB `template_id` clearing), upgrade to v1.0.4:
