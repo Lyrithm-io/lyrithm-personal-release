@@ -2,6 +2,58 @@
 
 All notable Lyrithm Personal release changes are documented here.
 
+## v1.0.4 - 2026-06-01 — Clean-VPS buyer-ready + multi-tenant Pulse + bot UI redesign
+
+First release that boots end-to-end on a fresh VPS from `docker compose up -d` alone, with no manual `application.yml` mount, no nginx side-car, no DB hack, no chmod workaround. This is the recommended starting point for new buyers.
+
+In addition to the clean-VPS fixes that landed on 2026-05-31, v1.0.4 ships the multi-tenant Lyrithm Pulse alert path so per-buyer alerts route to each owner's own Telegram chat instead of a single shared admin chat, the Stage-0 relay so the Personal binary no longer ships a Telegram bot token, and a redesigned bot UI built entirely on inline keyboards (with quick-action buttons on alert pushes and a two-step confirm before any market close).
+
+### Fixed
+
+- Engine image no longer hard-requires an external `/app/config/application.yml`. The bundled classpath config (`application.yml` + `application-personal.yml`) is now the source of truth; an external file is still honoured if mounted (`--spring.config.additional-location=optional:...`). v1.0.3 buyers had to copy the entire engine config file out of the repo or the engine refused to boot.
+- Compose healthcheck endpoint corrected from `/actuator/health` (which always 404'd — the engine has no Spring Actuator dependency) to `/api/v1/health` (the real `HealthController` route). The engine now reports `(healthy)` within 60s of boot instead of permanently `unhealthy`.
+- `license.json` permission story rewritten: the file is now `chmod 644` so the non-root engine user can read it. The previous `chmod 600 root:root` guidance silently broke every buyer install (`Permission denied` in the engine log; bot refused to start). The file is Ed25519-signed, so leaking the bytes does not let anyone forge a license.
+- Dashboard `/` route no longer crashes the Personal build with `Cannot read properties of null (reading 'sessionId')`. The page now redirects straight to `/dashboard` when `LYRITHM_EDITION=personal` and never touches Clerk.
+- Dashboard API proxy honours the runtime `LYRITHM_BACKEND_URL` / `LYRITHM_SANDBOX_URL` env vars. Previously the rewrite was baked into `routes-manifest.json` at `next build` time (a quirk of `output: standalone`), so the prebuilt GHCR image always shipped `http://localhost:8080` and could not reach the engine container at `http://engine:8080` without an nginx side-car. The proxy now runs as middleware and re-reads env vars on every request.
+- Backend REST endpoints no longer 401 in Personal mode. The engine's `CurrentUserResolver` now resolves to the single-tenant `LYRITHM_PERSONAL_OWNER_ID` UUID (default = legacy admin UUID) when no Clerk JWT and no `X-Lyrithm-User-Id` header is present. Cloud behaviour is unchanged.
+- Account deletion is now safe end-to-end. `DELETE /api/v1/account-credentials/{name}` orchestrates: (1) stop the running worker via `TradingEngine.removeAccount`, (2) delete the matching `strategy_instances` row so the ConfigPoller cannot resurrect the worker on the next 30s tick, (3) delete the encrypted credential row. The dashboard surfaces this in a two-tap confirm modal with an explicit "Exchange position is NOT auto-closed" warning.
+
+### Added
+
+- Default `LYRITHM_TRADING_INITIAL_STATE=idle` for Personal stacks. The bot boots without subscribing any account so a fresh install does not start placing orders before the operator wires their first exchange API key.
+- Default `LYRITHM_PERSONAL_OWNER_ID=00000000-0000-0000-0000-000000000001`. Overridable for buyers migrating an existing DB whose rows were stamped with a custom owner.
+- `<DeleteAccountButton>` two-tap component on the Accounts table — buyers can safely tear down an account from one click instead of editing the row first.
+- Human-readable Live Trade Config view. The Live Trading instance detail page now leads with named field cards (Risk per trade, Leverage base/min/max, Trading hours, ADX thresholds, On/Off pills, X/8 direction-rule pills) instead of dumping the raw three-layer JSON diff. The full template-default / override / effective table and the JSON override editor stay one click away under an "Advanced" collapsible.
+- Personal Add-Account form can use the built-in Java `vegas-adx` (`templateId=null`) or an uploaded Python strategy template. v1.0.4 now ships the bundled gRPC Python strategy worker in the Personal compose stack.
+- **Per-owner Telegram alert fan-out (sub-task 1).** New `TelegramRouter` + `AccountOwnerRegistry` route every per-account alert (trade open / close, ledger drift, hot-reload, API key health) to the chat owned by the account's owner. Operator-wide events (startup, daily summary) still go to the legacy admin chat. Producer signatures unchanged; behaviour is a drop-in upgrade.
+- **Lyrithm Pulse Stage-0 relay (sub-task 2).** Personal binary no longer carries a Telegram bot token. Bind + alert delivery now go through the Cloud relay (`POST /api/v1/pulse/relay/{start-bind,binding,send}`) authenticated by `Authorization: LyrithmLicense <id>`. New V26 Flyway migration adds `pulse_relay_bind_tokens` and `pulse_relay_bindings` tables, license-keyed. `@lyrithm_pulse_bot` deep-link handler tries the per-Clerk-user table first then falls through to the per-license relay table, so both Cloud users and Personal buyers bind through the same dashboard "Bind via Telegram" button and the same bot identity. The buyer's chat ID never leaves Cloud's database — Personal sees only the license id.
+- **Bot UI redesign on inline keyboards (sub-task 3).** Main menu is now one row per account that drills into a per-account view (LONG / SHORT / CLOSE / Info / Risk / Reload / Back), plus a global row for Status / Balance / P&L / Risk / Reload / Events / Instances / Emergency Stop. Slash command `/menu` and the persistent `🤖 Menu` reply-keyboard tile both open this surface. Demo button is no longer surfaced in the buyer menu (the `/demo` slash command stays for operators). Closing a position is a two-step `CLOSE` → confirm screen → `CLOSE_GO`, so a misclick on a quick-action button cannot fire a market order. Alert messages now carry one-tap quick-action buttons: trade-opened alerts surface `[Close][Info]`, drift alerts surface `[Reload][Info]`, API-key-failure alerts surface `[Info]`, reload-failed alerts surface `[Retry]`. The first interaction in each chat after upgrade attaches the new `🤖 Menu` reply keyboard, which automatically replaces any stale 11-button keyboard cached on the Telegram client from older builds.
+
+### Verified
+
+`docker-compose -f docker-compose.personal.yml up -d` on a fresh Ubuntu 22.04 VPS, no manual workarounds:
+
+- `ghcr.io/lyrithm-io/lyrithm-personal:1.0.4`
+- `ghcr.io/lyrithm-io/lyrithm-dashboard-personal:1.0.4`
+- `ghcr.io/lyrithm-io/lyrithm-strategy-worker-python:1.0.4`
+
+Smoke path: pull images without docker login → compose up → all four containers `(healthy)` → SSH-tunnel `/dashboard` → Add Aster mainnet account → Start instance → bot reports `running=true` with a live balance read → Delete account from UI → all rows gone.
+
+Bot-side smoke: pair `@lyrithm_pulse_bot` from the dashboard Settings page → `/start <token>` deep-link from Telegram → bot replies `✨ Lyrithm Pulse connected.` → tap `🤖 Menu` reply-keyboard tile → inline Main menu renders with account list + global actions → tap an account → per-account inline keyboard renders → tap `❌ Close` → two-step confirm screen renders before any market order fires.
+
+### Recommended upgrade
+
+If you are on v1.0.3 and hit any of the clean-VPS workarounds (license permission, nginx proxy, manual `application.yml` mount, DB `template_id` clearing), upgrade to v1.0.4:
+
+```bash
+cd ~/lyrithm-personal
+# Optional: drop any /app/config/application.yml mount line you added by hand.
+# Update LYRITHM_VERSION=1.0.4 in .env.
+docker compose -f docker-compose.personal.yml pull
+docker compose -f docker-compose.personal.yml up -d
+# If your license.json is still chmod 600, run:  chmod 644 license.json
+```
+
 ## v1.0.3 - 2026-05-30
 
 ### Fixed
@@ -46,3 +98,4 @@ All notable Lyrithm Personal release changes are documented here.
 - Personal engine image.
 - Personal dashboard image.
 - Signed license loading and local dashboard identity.
+

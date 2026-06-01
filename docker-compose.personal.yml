@@ -25,8 +25,28 @@ services:
       timeout: 5s
       retries: 5
 
+  strategy-worker-python:
+    image: ghcr.io/${GHCR_OWNER:-lyrithm-io}/lyrithm-strategy-worker-python:${LYRITHM_VERSION:-1.0.4}
+    container_name: lyrithm-personal-strategy-worker-python
+    restart: unless-stopped
+    expose:
+      - "50051"
+    volumes:
+      - strategy_sources:/app/data/strategies/_protected:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=INFO
+      - STRATEGIES_DIR=/app/data/strategies/_protected
+      - GRPC_PORT=50051
+    healthcheck:
+      test: ["CMD", "python", "-c", "import grpc; ch = grpc.insecure_channel('localhost:50051'); grpc.channel_ready_future(ch).result(timeout=2)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
   engine:
-    image: ghcr.io/${GHCR_OWNER:-lyrithm-io}/lyrithm-personal:${LYRITHM_VERSION:-1.0.3}
+    image: ghcr.io/${GHCR_OWNER:-lyrithm-io}/lyrithm-personal:${LYRITHM_VERSION:-1.0.4}
     container_name: lyrithm-personal-engine
     restart: unless-stopped
     dns:
@@ -35,9 +55,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      strategy-worker-python:
+        condition: service_healthy
     volumes:
       - ./license.json:/etc/lyrithm/license.json:ro
       - lyrithm_data:/var/lib/lyrithm
+      - strategy_sources:/app/data/strategies/_protected
       - ./strategies:/app/strategies:ro
     environment:
       - TZ=UTC
@@ -49,6 +72,7 @@ services:
       - LYRITHM_STRATEGY_CACHE_DIR=/var/lib/lyrithm/strategies
       - LYRITHM_ACTIVATION_API_URL=${LYRITHM_ACTIVATION_API_URL:-https://api.lyrithm.io}
       - LYRITHM_OBSERVATORY_API_URL=${LYRITHM_OBSERVATORY_API_URL:-https://api.lyrithm.io}
+      - STRATEGY_PROTECTED_DIR=/app/data/strategies/_protected
 
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -66,22 +90,43 @@ services:
 
       - LYRITHM_CREDENTIALS_FROM_DB=true
       - INSTANCES_FROM_DB=true
+      - GRPC_HOST=strategy-worker-python
+      - GRPC_PORT=50051
 
       - RISK_PER_TRADE=${RISK_PER_TRADE:-100}
       - MAX_DAILY_LOSS=${MAX_DAILY_LOSS:-300}
 
+      # v1.0.4 — boot idle, operator explicitly Starts from the dashboard
+      # after adding an exchange account. Cloud default is "active"; Personal
+      # overrides because a fresh install has no accounts wired yet.
+      - LYRITHM_TRADING_INITIAL_STATE=${LYRITHM_TRADING_INITIAL_STATE:-idle}
+
+      # v1.0.4 — Personal single-tenant owner UUID. Every dashboard request
+      # resolves to this UUID via the engine's Personal-edition fallback so
+      # the no-Clerk dashboard never sees a 401. Default = admin UUID; only
+      # override when migrating an existing buyer DB whose rows were stamped
+      # with a custom owner_user_id.
+      - LYRITHM_PERSONAL_OWNER_ID=${LYRITHM_PERSONAL_OWNER_ID:-00000000-0000-0000-0000-000000000001}
+
       - CLERK_JWT_ENABLED=false
       - STRIPE_ENABLED=false
-      - STRATEGY_UPLOAD_ENABLED=false
+      - STRATEGY_UPLOAD_ENABLED=${STRATEGY_UPLOAD_ENABLED:-true}
+      - LYRITHM_PULSE_ENABLED=${LYRITHM_PULSE_ENABLED:-false}
+      - LYRITHM_PULSE_BOT_USERNAME=${LYRITHM_PULSE_BOT_USERNAME:-}
+      - LYRITHM_PULSE_TOKEN_TTL=${LYRITHM_PULSE_TOKEN_TTL:-PT10M}
+      - LYRITHM_PULSE_WIDGET_DOMAIN=${LYRITHM_PULSE_WIDGET_DOMAIN:-}
     healthcheck:
-      test: ["CMD", "curl", "-fs", "http://127.0.0.1:8080/actuator/health"]
+      # v1.0.4 — engine has no Spring Actuator dep, so /actuator/health
+      # always 404'd. HealthController serves /api/v1/health (UP / IDLE /
+      # uptime / version).
+      test: ["CMD", "curl", "-fs", "http://127.0.0.1:8080/api/v1/health"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 60s
 
   dashboard:
-    image: ghcr.io/${GHCR_OWNER:-lyrithm-io}/lyrithm-dashboard-personal:${LYRITHM_VERSION:-1.0.3}
+    image: ghcr.io/${GHCR_OWNER:-lyrithm-io}/lyrithm-dashboard-personal:${LYRITHM_VERSION:-1.0.4}
     container_name: lyrithm-personal-dashboard
     restart: unless-stopped
     depends_on:
@@ -97,3 +142,4 @@ services:
 volumes:
   postgres_data:
   lyrithm_data:
+  strategy_sources:

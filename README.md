@@ -10,8 +10,8 @@ This repository contains the public release files needed to run Lyrithm Personal
 mkdir -p ~/lyrithm-personal
 cd ~/lyrithm-personal
 
-curl -fsSLO https://raw.githubusercontent.com/Lyrithm-io/lyrithm-personal-release/v1.0.3/docker-compose.personal.yml
-curl -fsSLO https://raw.githubusercontent.com/Lyrithm-io/lyrithm-personal-release/v1.0.3/.env.personal.example
+curl -fsSLO https://raw.githubusercontent.com/Lyrithm-io/lyrithm-personal-release/v1.0.4/docker-compose.personal.yml
+curl -fsSLO https://raw.githubusercontent.com/Lyrithm-io/lyrithm-personal-release/v1.0.4/.env.personal.example
 cp .env.personal.example .env
 ```
 
@@ -26,7 +26,7 @@ docker compose -f docker-compose.personal.yml pull
 docker compose -f docker-compose.personal.yml up -d
 ```
 
-Open <http://localhost:3000>.
+Open <http://localhost:3000/dashboard>.
 
 Full walkthrough: [SETUP.personal.md](SETUP.personal.md)
 
@@ -34,12 +34,14 @@ Full walkthrough: [SETUP.personal.md](SETUP.personal.md)
 
 | Image | Tag | Visibility |
 | --- | --- | --- |
-| `ghcr.io/lyrithm-io/lyrithm-personal` | `1.0.3` | Public |
-| `ghcr.io/lyrithm-io/lyrithm-dashboard-personal` | `1.0.3` | Public |
+| `ghcr.io/lyrithm-io/lyrithm-personal` | `1.0.4` | Public |
+| `ghcr.io/lyrithm-io/lyrithm-dashboard-personal` | `1.0.4` | Public |
+| `ghcr.io/lyrithm-io/lyrithm-strategy-worker-python` | `1.0.4` | Public |
 
-Verified digests for v1.0.3:
+Verified pull digests are added here after each release tag's GHCR build completes. v1.0.3 is still pullable for older buyers that have not upgraded; see [CHANGELOG.md](CHANGELOG.md) for the upgrade story.
 
 ```text
+# v1.0.3 (still pullable; superseded by v1.0.4 for new installs)
 ghcr.io/lyrithm-io/lyrithm-personal:1.0.3
 sha256:4b1f953d8dacefd93718149810c47912ad23dd57472864c683af927b52af3fd4
 
@@ -49,10 +51,11 @@ sha256:8e83697d07632b7a14ff47d24e39e008d4309c1827c68f8a2c1f80447c2f7eb3
 
 ## What Is Included
 
-Lyrithm Personal runs as three local containers:
+Lyrithm Personal runs as four local containers:
 
 - `lyrithm-personal-engine` - the trading engine
 - `lyrithm-personal-dashboard` - the local dashboard
+- `lyrithm-personal-strategy-worker-python` - the local gRPC Python strategy worker for Sandbox-uploaded strategies
 - `lyrithm-personal-postgres` - your local state database
 
 No Clerk, Stripe, or SaaS account is required for the local stack. Your signed `license.json` is the credential.
@@ -73,3 +76,4 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## Roadmap
 
 See [ROADMAP.md](ROADMAP.md).
+
