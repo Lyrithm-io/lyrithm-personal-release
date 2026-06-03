@@ -10,8 +10,8 @@ This repository contains the public release files needed to run Lyrithm Personal
 mkdir -p ~/lyrithm-personal
 cd ~/lyrithm-personal
 
-curl -fsSLO https://raw.githubusercontent.com/Lyrithm-io/lyrithm-personal-release/v1.0.4/docker-compose.personal.yml
-curl -fsSLO https://raw.githubusercontent.com/Lyrithm-io/lyrithm-personal-release/v1.0.4/.env.personal.example
+curl -fsSLO https://raw.githubusercontent.com/Lyrithm-io/lyrithm-personal-release/v1.1.0/docker-compose.personal.yml
+curl -fsSLO https://raw.githubusercontent.com/Lyrithm-io/lyrithm-personal-release/v1.1.0/.env.personal.example
 cp .env.personal.example .env
 ```
 
@@ -34,14 +34,19 @@ Full walkthrough: [SETUP.personal.md](SETUP.personal.md)
 
 | Image | Tag | Visibility |
 | --- | --- | --- |
-| `ghcr.io/lyrithm-io/lyrithm-personal` | `1.0.4` | Public |
-| `ghcr.io/lyrithm-io/lyrithm-dashboard-personal` | `1.0.4` | Public |
-| `ghcr.io/lyrithm-io/lyrithm-strategy-worker-python` | `1.0.4` | Public |
+| `ghcr.io/lyrithm-io/lyrithm-personal` | `1.1.0` | Public |
+| `ghcr.io/lyrithm-io/lyrithm-dashboard-personal` | `1.1.0` | Public |
+| `ghcr.io/lyrithm-io/lyrithm-strategy-worker-python` | `1.1.0` | Public |
 
-Verified pull digests are added here after each release tag's GHCR build completes. v1.0.3 is still pullable for older buyers that have not upgraded; see [CHANGELOG.md](CHANGELOG.md) for the upgrade story.
+Verified pull digests are added here after each release tag's GHCR build completes. v1.0.4 and v1.0.3 remain pullable for older buyers that have not upgraded; see [CHANGELOG.md](CHANGELOG.md) for the upgrade story.
 
 ```text
-# v1.0.3 (still pullable; superseded by v1.0.4 for new installs)
+# v1.0.4 (superseded by v1.1.0 for new installs)
+ghcr.io/lyrithm-io/lyrithm-personal:1.0.4
+ghcr.io/lyrithm-io/lyrithm-dashboard-personal:1.0.4
+ghcr.io/lyrithm-io/lyrithm-strategy-worker-python:1.0.4
+
+# v1.0.3 (older)
 ghcr.io/lyrithm-io/lyrithm-personal:1.0.3
 sha256:4b1f953d8dacefd93718149810c47912ad23dd57472864c683af927b52af3fd4
 
@@ -59,6 +64,8 @@ Lyrithm Personal runs as four local containers:
 - `lyrithm-personal-postgres` - your local state database
 
 No Clerk, Stripe, or SaaS account is required for the local stack. Your signed `license.json` is the credential.
+
+Starting in v1.1.0 the engine also opens an **outbound-only** HTTPS stream to `api.lyrithm.io` so Telegram inline buttons (`[Close]`, `[Reload]`, `[Info]`, `[Retry]`) and the Lyrithm Mini App can act on your data without anyone reaching back into your VPS. Your exchange keys and trade state stay local. The relay is mutually authenticated by your `license.json`; air-gapped buyers can disable it with `LYRITHM_PULSE_RELAY_ENABLED=false` and keep using the legacy direct-bot path. See [SETUP.personal.md](SETUP.personal.md).
 
 ## Support
 

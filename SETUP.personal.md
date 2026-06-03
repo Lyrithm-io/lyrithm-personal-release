@@ -1,6 +1,6 @@
 ﻿# Lyrithm Personal Edition Setup Guide
 
-> v1.0.4 - self-hosted, one-time-payment edition of the Lyrithm trading bot
+> v1.1.0 - self-hosted, one-time-payment edition of the Lyrithm trading bot
 
 This guide gets your purchased Lyrithm Personal Edition online from a clean VPS or local machine in about 10 minutes.
 
@@ -21,8 +21,8 @@ If you bought a license from <https://lyrithm.io/personal>, you should have rece
 mkdir -p ~/lyrithm-personal
 cd ~/lyrithm-personal
 
-curl -fsSLO https://raw.githubusercontent.com/Lyrithm-io/lyrithm-personal-release/v1.0.4/docker-compose.personal.yml
-curl -fsSLO https://raw.githubusercontent.com/Lyrithm-io/lyrithm-personal-release/v1.0.4/.env.personal.example
+curl -fsSLO https://raw.githubusercontent.com/Lyrithm-io/lyrithm-personal-release/v1.1.0/docker-compose.personal.yml
+curl -fsSLO https://raw.githubusercontent.com/Lyrithm-io/lyrithm-personal-release/v1.1.0/.env.personal.example
 cp .env.personal.example .env
 ```
 
@@ -90,11 +90,24 @@ Trading engine started in IDLE mode - no accounts will be subscribed.
 
 The bot intentionally boots in IDLE so you can wire your first exchange account from the dashboard before any real subscription happens. Telegram alerts (if configured) will fire on activation success.
 
-### Pulse alert quick-action buttons - known limitation
+### Pulse alert quick-action buttons (new in v1.1.0)
 
-Alert messages delivered through the hosted Lyrithm Pulse relay (the default Personal path) carry inline keyboard buttons such as `[Close]`, `[Reload]`, `[Info]`, and `[Retry]`. These buttons are **rendered but not yet wired** for Personal Edition in v1.0.4: tapping them does not execute the action because the callback round-trip back to your local engine is not implemented in Stage-0 of the relay. Alerts themselves deliver fine; only the one-tap buttons are decorative for now.
+Alert messages delivered through the hosted Lyrithm Pulse relay carry inline keyboard buttons such as `[Close]`, `[Reload]`, `[Info]`, and `[Retry]`. In v1.1.0 these buttons **execute on your local engine** through the Stage-1 bidirectional relay channel:
 
-Use the dashboard or the bot's main menu (`/menu` slash command or the `Menu` reply-keyboard tile) to act on alerts in the meantime. Stage-1 of the Pulse relay (v1.1+) adds the bidirectional channel that makes these buttons interactive.
+- `[Close]` on a trade-opened alert renders a two-step confirm screen, then fires a market-order close at the same exchange the trade opened on.
+- `[Reload]` on a drift alert calls the engine's `ReloadService` to re-apply parameter changes from your dashboard.
+- `[Info]` renders live balance + open-position state from your configured exchange adapter.
+- `[Retry]` on a reload-failure alert re-runs the reload.
+
+Tap-to-action round-trip is typically under 1.5 seconds. If your engine is offline the bot answers the tap with `"Personal engine offline. Retry shortly."` so the spinner clears immediately.
+
+### Telegram Mini App (new in v1.1.0)
+
+Open `@lyrithm_pulse_bot` in Telegram and tap the chat menu button (left of the text box). The Lyrithm dashboard launches inline as a Telegram Mini App: Overview / Strategies / Alerts / Accounts. All data is fetched live from **your own engine** through the relay; nothing is rendered from a Cloud cache. You can act on your bot from your phone without an SSH tunnel.
+
+If you opted out of the relay (`LYRITHM_PULSE_RELAY_ENABLED=false`), the Mini App will show "Personal engine offline" — use the local dashboard over SSH tunnel instead.
+
+### Activation grace
 
 If activation is temporarily unreachable, the engine enters offline grace mode (14 days); see Troubleshooting.
 
@@ -118,7 +131,7 @@ Go to **Dashboard -> Accounts -> Add account**.
 2. Paste API key + secret (and the third field for OKX, Bitget, EVM DEX, or dYdX as prompted).
 3. Save.
 
-v1.0.4 includes the built-in Java `vegas-adx` strategy and the local gRPC Python strategy worker. You can use `vegas-adx` immediately, or upload a Python template in **Dashboard -> Sandbox Labs** and select it when adding an exchange account.
+v1.1.0 includes the built-in Java `vegas-adx` strategy and the local gRPC Python strategy worker. You can use `vegas-adx` immediately, or upload a Python template in **Dashboard -> Sandbox Labs** and select it when adding an exchange account.
 
 Credentials are encrypted locally using `LYRITHM_MASTER_KEY`. They never leave your machine.
 
@@ -195,7 +208,7 @@ docker compose -f docker-compose.personal.yml exec engine \
   curl -fs http://127.0.0.1:8080/api/v1/health
 ```
 
-Expected: `{"status":"UP","uptimeMs":??"activeAccounts":??"tradingState":"IDLE","version":"1.0.4-??}`.
+Expected: `{"status":"UP","uptimeMs":??"activeAccounts":??"tradingState":"IDLE","version":"1.1.0-??}`.
 
 If the engine is healthy but the dashboard cannot reach it, confirm the dashboard container is using the same docker network (compose auto-wires this) and that no host firewall is blocking the internal `engine:8080` hop.
 

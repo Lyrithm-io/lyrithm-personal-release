@@ -2,6 +2,113 @@
 
 All notable Lyrithm Personal release changes are documented here.
 
+## v1.1.0 - 2026-06-03 — Stage-1 bidirectional channel: alert buttons live, Mini App support
+
+First minor-version bump in the Personal line. v1.1.0 closes the two
+"rendered-but-decorative" disclaimers from v1.0.4 by shipping
+**Stage-1 of the Lyrithm Pulse relay** — a bidirectional channel
+between Cloud and your local engine. Two buyer-visible features land
+with it:
+
+1. **Pulse alert quick-action buttons are now interactive.** Tap
+   `[Close]` on a trade-opened alert and your engine fires the
+   market-order close. Tap `[Reload]` on a drift alert and the
+   instance picks up the latest parameter changes from your
+   dashboard. Tap `[Info]` and a fresh balance + open-position
+   snapshot lands in the chat. No more silent taps.
+2. **Telegram Mini App now works for Personal buyers.** Open
+   `@lyrithm_pulse_bot` in Telegram, hit the menu button, and the
+   Lyrithm dashboard launches inline. All four screens — Overview,
+   Strategies, Alerts, Accounts — render live data fetched from your
+   own engine, transparently relayed through Cloud.
+
+The relay is **outbound-only**: your engine opens a long-lived HTTPS
+stream to `api.lyrithm.io` and the Cloud bot writes through it.
+There is no inbound port on your VPS, no DDNS, no proxy. Your
+exchange API keys, trade state, and license signing key never cross
+the relay — Cloud handles routing, not authentication. The relay is
+mutually authenticated by the same `LyrithmLicense` bearer your
+engine has used since v1.0.
+
+### Added
+
+- **Stage-1 relay client (engine).** New `RelaySessionClient` opens
+  `GET /api/v1/pulse/relay/stream` to Cloud at startup, parses
+  Server-Sent Event frames, dispatches inbound `TG_CALLBACK` and
+  `API_CALL` requests to the engine, and posts responses back via
+  `POST /api/v1/pulse/relay/respond`. Reconnect loop is
+  exponential-backoff with full jitter (1s → 2s → … → 30s) and
+  uses `X-Lyrithm-Resume-Session-Id` for session continuity through
+  network blips. Default-on; opt-out via
+  `LYRITHM_PULSE_RELAY_ENABLED=false`.
+- **Real engine actions on alert button taps.** `[Close][Yes]` calls
+  the same `cancelAllOrders` + `placeMarketOrder` pair the dashboard
+  Close button uses. `[Reload]` calls `ReloadService.reload`.
+  `[Info]` renders live `AccountInfo` + `PositionInfo` from your
+  configured exchange adapter.
+- **Mini App `personal_only` state mounts the full AppShell.**
+  The Phase 1 placeholder card is gone; Personal-tier buyers now
+  see the same four-tab UI as Cloud users. Live KPIs, strategy
+  list, accounts table, alerts feed — all fetched from your engine.
+- **SETUP.personal.md** has a new "Stage-1 bidirectional channel"
+  section explaining the architecture, the opt-out flag, and the
+  trust model.
+
+### Changed
+
+- Compose default `LYRITHM_VERSION` bumped to `1.1.0`.
+- Engine no longer logs `RelayPulseDelivery disabled` at startup by
+  default — the relay is on. Air-gapped buyers see the disabled
+  message once they set `LYRITHM_PULSE_RELAY_ENABLED=false`.
+
+### Removed
+
+- The v1.0.4 "Known limitations" disclaimers about alert buttons and
+  Mini App support are obsolete. They were the proximate motivation
+  for shipping Stage-1.
+
+### Verified
+
+`docker-compose -f docker-compose.personal.yml up -d` on a fresh
+Ubuntu 22.04 VPS:
+
+- `ghcr.io/lyrithm-io/lyrithm-personal:1.1.0`
+- `ghcr.io/lyrithm-io/lyrithm-dashboard-personal:1.1.0`
+- `ghcr.io/lyrithm-io/lyrithm-strategy-worker-python:1.1.0`
+
+Bot-side smoke: pair `@lyrithm_pulse_bot` → open a position from the
+dashboard → wait for the `Trade opened` Pulse alert → tap `[Close]`
+on the alert → confirm screen renders within ~1s → tap `[Yes]` →
+position closes on the exchange → confirmation message lands in
+the chat.
+
+Mini App smoke: open the bot in Telegram → tap the menu button →
+Mini App opens → Overview shows live total equity, open P&L,
+closed-PnL-30d, win rate, equity curve sparkline — all read from
+your own engine via the relay.
+
+### Recommended upgrade
+
+If you are on v1.0.4 and want the interactive alert buttons + Mini
+App, upgrade in place:
+
+```bash
+cd ~/lyrithm-personal
+# Update LYRITHM_VERSION=1.1.0 in .env.
+docker compose -f docker-compose.personal.yml pull
+docker compose -f docker-compose.personal.yml up -d
+```
+
+No schema breakage, no config rewrites. The relay client opens its
+outbound stream on first boot.
+
+If you are running on an air-gapped network and never want your
+engine to talk to `api.lyrithm.io` even for Pulse outbound, set
+`LYRITHM_PULSE_RELAY_ENABLED=false` in `.env` before upgrade. Your
+engine continues to operate; you lose the new button + Mini App
+features but the legacy direct-bot path (using your own
+`TELEGRAM_BOT_TOKEN`) still works.
+
 ## v1.0.4 - 2026-06-01 — Clean-VPS buyer-ready + multi-tenant Pulse + bot UI redesign
 
 First release that boots end-to-end on a fresh VPS from `docker compose up -d` alone, with no manual `application.yml` mount, no nginx side-car, no DB hack, no chmod workaround. This is the recommended starting point for new buyers.

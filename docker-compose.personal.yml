@@ -26,7 +26,7 @@ services:
       retries: 5
 
   strategy-worker-python:
-    image: ghcr.io/${GHCR_OWNER:-lyrithm-io}/lyrithm-strategy-worker-python:${LYRITHM_VERSION:-1.0.4}
+    image: ghcr.io/${GHCR_OWNER:-lyrithm-io}/lyrithm-strategy-worker-python:${LYRITHM_VERSION:-1.1.0}
     container_name: lyrithm-personal-strategy-worker-python
     restart: unless-stopped
     expose:
@@ -46,7 +46,7 @@ services:
       start_period: 15s
 
   engine:
-    image: ghcr.io/${GHCR_OWNER:-lyrithm-io}/lyrithm-personal:${LYRITHM_VERSION:-1.0.4}
+    image: ghcr.io/${GHCR_OWNER:-lyrithm-io}/lyrithm-personal:${LYRITHM_VERSION:-1.1.0}
     container_name: lyrithm-personal-engine
     restart: unless-stopped
     dns:
@@ -126,7 +126,7 @@ services:
       start_period: 60s
 
   dashboard:
-    image: ghcr.io/${GHCR_OWNER:-lyrithm-io}/lyrithm-dashboard-personal:${LYRITHM_VERSION:-1.0.4}
+    image: ghcr.io/${GHCR_OWNER:-lyrithm-io}/lyrithm-dashboard-personal:${LYRITHM_VERSION:-1.1.0}
     container_name: lyrithm-personal-dashboard
     restart: unless-stopped
     depends_on:
