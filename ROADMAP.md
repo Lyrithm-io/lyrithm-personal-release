@@ -11,12 +11,15 @@ This roadmap is intentionally practical: it lists buyer-visible improvements tha
 - **v1.0.1** - Light-first license email template redesign.
 - **v1.0.0** - First public Personal Edition image line.
 
+## v1.1.x - shipped
+
+- ✅ Clearer exchange-specific API-key permission guidance — per-exchange enable/disable matrix + IP whitelist guidance in [SETUP.personal.md](SETUP.personal.md#exchange-api-key-permissions). Covers Binance, OKX, Bybit, Bitget, Hyperliquid, dYdX v4, Aster.
+- ✅ Expanded troubleshooting docs — Docker Desktop file sharing on macOS / Windows, VPS `ufw` firewall posture (no inbound ports needed; outbound-only relay), port-in-use overrides for 3000 / 8080, GHCR pull troubleshooting. See [SETUP.personal.md Troubleshooting](SETUP.personal.md#troubleshooting).
+
 ## v1.1.x - next
 
 - Improve first-run diagnostics in the dashboard (license tier, activation status, version mismatch warning).
 - Add a dashboard backup/export helper (one-click `pg_dump` + `.env` reminder).
-- Add clearer exchange-specific API-key permission guidance.
-- Expand troubleshooting docs with common Docker Desktop and VPS firewall cases.
 - Lyrithm SDK ships full indicator implementations (no more shim layer); sandbox + Personal share the same indicator code path.
 - Better Personal/Cloud strategy sync status UI.
 - Exchange-aware symbol list in strategy tools.

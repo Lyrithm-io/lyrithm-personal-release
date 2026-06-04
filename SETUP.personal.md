@@ -135,6 +135,24 @@ v1.1.0 includes the built-in Java `vegas-adx` strategy and the local gRPC Python
 
 Credentials are encrypted locally using `LYRITHM_MASTER_KEY`. They never leave your machine.
 
+### Exchange API key permissions
+
+Lyrithm Personal Edition is non-custodial: the bot reads market data, opens / modifies / closes futures positions, but **never withdraws**. Cut your API keys to match — if the bot's key is ever leaked, the blast radius stays inside the futures wallet you fund it with.
+
+| Exchange | Enable | Disable | Required third field |
+| --- | --- | --- | --- |
+| Binance | Enable Futures, Enable Reading | **Disable Spot trading, Disable Internal Transfer, Disable Universal Transfer, NEVER enable Withdrawals** | — |
+| OKX | Trade + Read | **No Withdraw** | API passphrase |
+| Bybit | Read-Write (Derivatives only) | **No Withdrawal, No Sub-account transfer** | — |
+| Bitget | Read + Trade | **No Withdraw, No Internal transfer** | API passphrase |
+| Hyperliquid | Trade | **No Vault transfer** | API wallet private key |
+| dYdX v4 | Trade | (no key — wallet-signed) | Stark / mnemonic seed |
+| Aster | Read + Trade Perpetual | **No Withdraw** | — |
+
+**IP whitelist** — every CEX listed supports per-key IP allow-listing. Always add your VPS's outbound IP. The whitelist is the single most impactful key-leak mitigation; do not skip it.
+
+If you rotate a key, edit the account from **Dashboard -> Accounts -> [account] -> Edit credentials**. The rotation is hot — the running worker picks up the new key on its next health probe (typically within 5 minutes); restart is not required.
+
 ## Step 6 - Start Trading
 
 Go to **Live Trading** and Start the instance the Accounts page created.
@@ -197,6 +215,56 @@ docker compose -f docker-compose.personal.yml restart engine
 ```
 
 The license is signed; world-readable is safe (the bytes alone do not let anyone forge a license).
+
+### Docker Desktop on macOS / Windows — file sharing
+
+If you installed Docker Desktop locally (rather than running on a Linux VPS), the install directory needs to be inside a path Docker Desktop is allowed to bind-mount. Symptoms:
+
+- engine logs `License file unreadable` or `failed to read license.json` even though `chmod 644 license.json` is correct,
+- engine restarts repeatedly in a `CrashLoopBackOff`-style pattern.
+
+Fix: in Docker Desktop -> Settings -> Resources -> File Sharing, add the parent path of `~/lyrithm-personal` (e.g. `/Users/<you>` on macOS, `C:\Users\<you>` on Windows). Apply & Restart. Alternatively move the install directory under an already-shared path such as `~/Documents/lyrithm-personal`.
+
+### Port already in use (3000 / 5432 / 8080)
+
+```text
+Error response from daemon: driver failed programming external connectivity on endpoint
+lyrithm-personal-dashboard: Bind for 0.0.0.0:3000 failed: port is already allocated
+```
+
+Another process is bound to the same port. Either stop that process, or override the published port in your `.env`:
+
+```bash
+# .env — uncomment + change as needed
+DASHBOARD_PORT=3010
+ENGINE_PORT=8081
+```
+
+Then `docker compose -f docker-compose.personal.yml up -d --force-recreate`. Postgres (5432) is only exposed inside the compose network by default, so a local Postgres on the host does not conflict.
+
+### VPS firewall — recommended inbound posture
+
+Lyrithm Personal does NOT need any inbound port open to the public internet. The dashboard at `3000` and the engine at `8080` are only ever reached via the loopback interface inside the VPS (you SSH-tunnel to them from your laptop), and the optional Pulse relay is **outbound-only** to `api.lyrithm.io`.
+
+A safe `ufw` posture on Ubuntu:
+
+```bash
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow 22/tcp     # SSH only
+sudo ufw enable
+```
+
+Do not open 3000 / 8080 to the world — the dashboard auth is the license file, and the engine has no auth wall in front of it. SSH-tunneling is the supported access pattern.
+
+### Cannot pull image / 401 Unauthorized on `docker compose pull`
+
+The Lyrithm Personal images are published as **public** packages on GHCR; you should not need `docker login`. If the pull still fails:
+
+1. Confirm you're targeting `ghcr.io/lyrithm-io/...` (not the old `xxxjay123/...` namespace).
+2. Confirm Docker daemon has IPv4 internet (`docker pull hello-world`).
+3. Clear any stale `docker login` for `ghcr.io`: `docker logout ghcr.io`.
+4. If you're behind a corporate proxy, set `HTTP_PROXY` / `HTTPS_PROXY` on the Docker daemon and restart the service.
 
 ### Engine reports unhealthy / dashboard says backend offline
 
