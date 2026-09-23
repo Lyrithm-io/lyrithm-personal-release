@@ -2,6 +2,11 @@
 
 Self-hosted Lyrithm trading bot for licensed Personal Edition buyers.
 
+> This working tree prepares the **next release**. The public image pins below
+> remain `1.1.0`; activation status and the buyer-flow fixes require new engine
+> and dashboard images. They have not been published yet. Use a complete,
+> published release set rather than mixing these files with older images.
+
 This repository contains the public release files needed to run Lyrithm Personal on your own machine or VPS. The Docker images are published on GitHub Container Registry; your `license.json` unlocks the edition and tier you purchased.
 
 ## Quick Start
@@ -56,12 +61,20 @@ sha256:8e83697d07632b7a14ff47d24e39e008d4309c1827c68f8a2c1f80447c2f7eb3
 
 ## What Is Included
 
-Lyrithm Personal runs as four local containers:
+The next-release stack runs five local services plus a one-shot `init-data`
+job that prepares persistent-volume permissions and the bundled open-source
+example before the non-root engine starts:
 
 - `lyrithm-personal-engine` - the trading engine
 - `lyrithm-personal-dashboard` - the local dashboard
 - `lyrithm-personal-strategy-worker-python` - the local gRPC Python strategy worker for Sandbox-uploaded strategies
 - `lyrithm-personal-postgres` - your local state database
+- `lyrithm-personal-redis` - persistent Binance cooldowns and request budgets
+
+Settings shows activation success, a fixed initial offline-grace deadline, and
+connection retry status. Keep the same Compose project and volumes on upgrade;
+see the [setup and recovery guide](SETUP.personal.md). The published `v1.1.0`
+quick-start downloads above retain their historical four-service package.
 
 No Clerk, Stripe, or SaaS account is required for the local stack. Your signed `license.json` is the credential.
 

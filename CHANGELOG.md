@@ -2,6 +2,30 @@
 
 All notable Lyrithm Personal release changes are documented here.
 
+## Unreleased — Personal activation and buyer-flow acceptance
+
+- Authenticated first activation with a persistent installation identity and a
+  single 14-day grace window for temporary first-contact failures. Successful
+  activation supports offline restarts; explicit rejection never grants grace.
+- Settings activation status and retry action; Cloud marketplace billing and
+  creator payout pages are hidden in Personal.
+- Python uploads remain visible and can be assigned to local instances. The
+  bundled worker is now reflected in the catalog and provisioning guards.
+- Durable Redis, separate image-version overrides, backup-encryption forwarding,
+  preserved bundled examples, and a one-shot data-volume ownership initializer.
+- Application JSON uses Jackson 3 with preserved API/license/relay contracts.
+  Vendor libraries may still require their own Jackson 2 dependencies.
+- Updated setup, upgrade, permissions and complete backup guidance.
+- Personal image uses PostgreSQL 16 backup tools to match the bundled database;
+  encrypted downloads have documented decryption and were restore-tested.
+- Activation identity damage fails closed without resetting grace; server retry
+  deadlines survive restart, including oversized Retry-After values.
+- Both engine and Python worker wait for volume initialization to complete.
+- Pull requests validate Compose startup order, local bindings, persistent
+  volumes, and legacy/independent image-version overrides.
+
+No new release tag or image pins have been published for these changes.
+
 ## v1.1.0 - 2026-06-03 — Stage-1 bidirectional channel: alert buttons live, Mini App support
 
 First minor-version bump in the Personal line. v1.1.0 closes the two
