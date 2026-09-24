@@ -1,12 +1,55 @@
 ﻿# =====================================================================
-# Lyrithm Personal Edition - Docker Compose stack
+# Lyrithm Personal Edition - docker compose stack
 # =====================================================================
-# Three services, single-tenant, bound to localhost by default.
-# No Clerk, no Stripe. The signed license.json mounted into the engine
-# is the credential.
+#
+# This file is the buyer's docker-compose. Five services, single-tenant,
+# all bound to localhost by default. No Clerk, no Stripe - the signed
+# license.json in /etc/lyrithm/license.json is the credential.
+#
+# Quick start (see SETUP.personal.md for the full walkthrough):
+#
+#   1. cp .env.personal.example .env
+#   2. Edit .env - at minimum set DB_PASSWORD + LYRITHM_MASTER_KEY
+#   3. Drop your purchased license.json next to this file
+#   4. docker compose -f docker-compose.personal.yml up -d
+#   5. Open http://localhost:3000
+#
+# Image tags are pinned to a major version line ({tier}-locked per the
+# spec v2 version-lock policy). Stay within v1.x.x for the duration of
+# your purchased update window - version bumps happen via:
+#
+#   docker compose -f docker-compose.personal.yml pull && \
+#   docker compose -f docker-compose.personal.yml up -d
 # =====================================================================
 
 services:
+
+  # One-shot preparation only; the engine itself continues to run non-root.
+  # Older worker-first installs created the shared source volume as root,
+  # so uploads failed even when all five long-running services were healthy.
+  init-data:
+    image: ghcr.io/${GHCR_OWNER:-lyrithm-io}/lyrithm-personal:${LYRITHM_ENGINE_VERSION:-${LYRITHM_VERSION:-1.3.7}}
+    user: "0:0"
+    restart: "no"
+    network_mode: none
+    entrypoint:
+      - sh
+      - -ec
+      - |
+        if [ -f /app/strategies/examples/gamma-bb-mr/strategy.py ] && [ ! -e /sources/00000000-0000-0000-0000-00000000ad12/strategy.py ]; then
+          mkdir -p /sources/00000000-0000-0000-0000-00000000ad12
+          cp /app/strategies/examples/gamma-bb-mr/strategy.py /sources/00000000-0000-0000-0000-00000000ad12/strategy.py
+        fi
+        chown -R lyrithm:lyrithm /sources /var/lib/lyrithm
+    volumes:
+      - strategy_sources:/sources
+      - lyrithm_data:/var/lib/lyrithm
+
+  # -------------------------------------------------------------------
+  # postgres - license-bound state (positions, trades, instances)
+  # -------------------------------------------------------------------
+  # Single-tenant. Internal-only (never published to host). Backups live
+  # in the named postgres_data volume. See SETUP for the complete backup set.
   postgres:
     image: postgres:16-alpine
     container_name: lyrithm-personal-postgres
@@ -25,10 +68,30 @@ services:
       timeout: 5s
       retries: 5
 
+  # Durable Binance cooldown/budgets; no host port or exchange credentials.
+  redis:
+    image: redis:7-alpine
+    container_name: lyrithm-personal-redis
+    restart: unless-stopped
+    mem_limit: 128m
+    command: redis-server --maxmemory 64mb --maxmemory-policy volatile-lru --appendonly yes --appendfsync always
+    volumes:
+      - redis_data:/data
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   strategy-worker-python:
-    image: ghcr.io/${GHCR_OWNER:-lyrithm-io}/lyrithm-strategy-worker-python:${LYRITHM_VERSION:-1.1.0}
+    image: ghcr.io/${GHCR_OWNER:-lyrithm-io}/lyrithm-strategy-worker-python:${LYRITHM_WORKER_VERSION:-${LYRITHM_VERSION:-1.3.7}}
     container_name: lyrithm-personal-strategy-worker-python
     restart: unless-stopped
+    depends_on:
+      init-data:
+        condition: service_completed_successfully
     expose:
       - "50051"
     volumes:
@@ -45,28 +108,54 @@ services:
       retries: 3
       start_period: 15s
 
+  # -------------------------------------------------------------------
+  # engine - the trading bot (Lyrithm Personal Edition)
+  # -------------------------------------------------------------------
+  # Image bundles the bundled SDK examples (sma-crossover, ema-cross),
+  # the Personal-edition Spring profile, and the v1 Ed25519 public key
+  # baked into the Java resources. Pulls closed-source strategies from
+  # the Cloud Observatory at runtime (Owner tier only, encrypted in
+  # flight per spec 禮6 / S3.5).
   engine:
-    image: ghcr.io/${GHCR_OWNER:-lyrithm-io}/lyrithm-personal:${LYRITHM_VERSION:-1.1.0}
+    image: ghcr.io/${GHCR_OWNER:-lyrithm-io}/lyrithm-personal:${LYRITHM_ENGINE_VERSION:-${LYRITHM_VERSION:-1.3.7}}
     container_name: lyrithm-personal-engine
     restart: unless-stopped
+    # Pin DNS to public resolvers ??JDK17 dual-stack DNS lookup is flaky
+    # against CloudFront-fronted hosts under Docker Desktop on Windows.
     dns:
       - 8.8.8.8
       - 1.1.1.1
     depends_on:
+      init-data:
+        condition: service_completed_successfully
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       strategy-worker-python:
         condition: service_healthy
     volumes:
+      # License file ??REQUIRED. The bot fails fast on missing /
+      # tampered files. Mount as read-only so a runaway process can't
+      # rewrite the credential by accident.
       - ./license.json:/etc/lyrithm/license.json:ro
+
+      # Activation marker + local strategy cache.
       - lyrithm_data:/var/lib/lyrithm
+
+      # Uploaded Python strategy source shared with the gRPC worker.
       - strategy_sources:/app/data/strategies/_protected
-      - ./strategies:/app/strategies:ro
+
+      # User's own custom strategies ??drop .py files in ./strategies/
+      # and the bot will pick them up at next restart.
+      - ./strategies:/app/strategies/custom:ro
     environment:
       - TZ=UTC
       - JAVA_OPTS=-Xmx384m -Djava.net.preferIPv4Stack=true
 
+      # ----- Personal-edition profile activation -----
       - LYRITHM_EDITION=personal
+      - LYRITHM_VERSION=${LYRITHM_ENGINE_VERSION:-${LYRITHM_VERSION:-1.3.7}}
       - LYRITHM_LICENSE_FILE=/etc/lyrithm/license.json
       - LYRITHM_ACTIVATED_FLAG=/var/lib/lyrithm/activated.flag
       - LYRITHM_STRATEGY_CACHE_DIR=/var/lib/lyrithm/strategies
@@ -74,64 +163,106 @@ services:
       - LYRITHM_OBSERVATORY_API_URL=${LYRITHM_OBSERVATORY_API_URL:-https://api.lyrithm.io}
       - STRATEGY_PROTECTED_DIR=/app/data/strategies/_protected
 
+      # ----- DB (internal docker network) -----
       - DB_HOST=postgres
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - BINANCE_EGRESS_GROUP=${BINANCE_EGRESS_GROUP:-default}
+      - BINANCE_WEIGHT_PER_MINUTE=${BINANCE_WEIGHT_PER_MINUTE:-1800}
+      - BINANCE_ORDERS_PER_10S=${BINANCE_ORDERS_PER_10S:-150}
+      - BINANCE_ORDERS_PER_MINUTE=${BINANCE_ORDERS_PER_MINUTE:-600}
       - DB_PORT=5432
       - DB_NAME=${DB_NAME:-lyrithm}
       - DB_USER=${DB_USER:-lyrithm}
       - DB_PASSWORD=${DB_PASSWORD:?DB_PASSWORD is required}
 
+      # ----- Web admin REST API -----
+      # 127.0.0.1 keeps admin endpoints off public internet by default.
+      # Dashboard reaches engine via the docker network on port 8080.
       - WEB_BIND_ADDRESS=0.0.0.0
       - WEB_PORT=8080
 
-      - LYRITHM_MASTER_KEY=${LYRITHM_MASTER_KEY:?LYRITHM_MASTER_KEY required - see .env.personal.example}
+      # ----- Encryption -----
+      # Required for storing exchange API credentials encrypted in DB.
+      # Generate once: openssl rand -base64 32
+      - LYRITHM_MASTER_KEY=${LYRITHM_MASTER_KEY:?LYRITHM_MASTER_KEY required ??see .env.personal.example}
 
+      - LYRITHM_BACKUP_ENCRYPTION_KEY=${LYRITHM_BACKUP_ENCRYPTION_KEY:-}
+
+      # ----- Optional Telegram alerts (legacy direct path) -----
+      # Most buyers leave these unset and rely on Lyrithm Pulse relay
+      # (default ON). Set them only if you want a personal bot token
+      # for direct delivery + legacy admin chat fallthrough.
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-0}
 
+      # ----- Exchange API keys (user-managed via dashboard) -----
+      # Personal edition reads exchange credentials from the DB after
+      # the user adds them through the dashboard's Accounts page. No
+      # env vars required here for that path.
       - LYRITHM_CREDENTIALS_FROM_DB=true
       - INSTANCES_FROM_DB=true
       - GRPC_HOST=strategy-worker-python
       - GRPC_PORT=50051
 
+      # ----- Risk defaults -----
       - RISK_PER_TRADE=${RISK_PER_TRADE:-100}
       - MAX_DAILY_LOSS=${MAX_DAILY_LOSS:-300}
 
-      # v1.0.4 — boot idle, operator explicitly Starts from the dashboard
-      # after adding an exchange account. Cloud default is "active"; Personal
-      # overrides because a fresh install has no accounts wired yet.
+      # ----- Trading state -----
+      # Buyer Personal stack boots idle; the operator explicitly Starts
+      # from the dashboard after adding an exchange account. Default in
+      # application.yml is "active" (Cloud assumes always-on); Personal
+      # overrides because a fresh install has no accounts yet.
       - LYRITHM_TRADING_INITIAL_STATE=${LYRITHM_TRADING_INITIAL_STATE:-idle}
 
-      # v1.0.4 — Personal single-tenant owner UUID. Every dashboard request
-      # resolves to this UUID via the engine's Personal-edition fallback so
-      # the no-Clerk dashboard never sees a 401. Default = admin UUID; only
-      # override when migrating an existing buyer DB whose rows were stamped
-      # with a custom owner_user_id.
-      - LYRITHM_PERSONAL_OWNER_ID=${LYRITHM_PERSONAL_OWNER_ID:-00000000-0000-0000-0000-000000000001}
+      # ----- Strategy uploads + Telegram notifications -----
+      - STRATEGY_UPLOAD_ENABLED=${STRATEGY_UPLOAD_ENABLED:-true}
+      # Lyrithm Pulse — Personal binaries do NOT ship a Telegram bot
+      # token. Pulse defaults to ON, delivering alerts through the
+      # Cloud relay at api.lyrithm.io with the bearer license_id as
+      # credential. Buyers bind their Telegram chat via the dashboard
+      # Settings page → deep-link to @lyrithm_pulse_bot → tap Start.
+      # To opt out (and use only the legacy admin chat path), set
+      # LYRITHM_PULSE_RELAY_ENABLED=false in .env.
+      - LYRITHM_PULSE_ENABLED=${LYRITHM_PULSE_ENABLED:-true}
+      - LYRITHM_PULSE_BOT_USERNAME=${LYRITHM_PULSE_BOT_USERNAME:-lyrithm_pulse_bot}
+      - LYRITHM_PULSE_TOKEN_TTL=${LYRITHM_PULSE_TOKEN_TTL:-PT10M}
+      - LYRITHM_PULSE_RELAY_ENABLED=${LYRITHM_PULSE_RELAY_ENABLED:-true}
+      - LYRITHM_PULSE_RELAY_ENDPOINT=${LYRITHM_PULSE_RELAY_ENDPOINT:-https://api.lyrithm.io}
+      - LYRITHM_PULSE_RELAY_TIMEOUT=${LYRITHM_PULSE_RELAY_TIMEOUT:-PT15S}
 
+      # ----- Cloud-specific knobs DISABLED in Personal -----
+      # Belt-and-braces: the @Profile("cloud") beans don't load when
+      # LYRITHM_EDITION=personal, but we also unset their env vars so
+      # nothing accidentally inherits a Cloud value from a host shell.
       - CLERK_JWT_ENABLED=false
       - STRIPE_ENABLED=false
-      - STRATEGY_UPLOAD_ENABLED=${STRATEGY_UPLOAD_ENABLED:-true}
-      - LYRITHM_PULSE_ENABLED=${LYRITHM_PULSE_ENABLED:-false}
-      - LYRITHM_PULSE_BOT_USERNAME=${LYRITHM_PULSE_BOT_USERNAME:-}
-      - LYRITHM_PULSE_TOKEN_TTL=${LYRITHM_PULSE_TOKEN_TTL:-PT10M}
-      - LYRITHM_PULSE_WIDGET_DOMAIN=${LYRITHM_PULSE_WIDGET_DOMAIN:-}
     healthcheck:
-      # v1.0.4 — engine has no Spring Actuator dep, so /actuator/health
-      # always 404'd. HealthController serves /api/v1/health (UP / IDLE /
-      # uptime / version).
       test: ["CMD", "curl", "-fs", "http://127.0.0.1:8080/api/v1/health"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 60s
 
+  # -------------------------------------------------------------------
+  # dashboard - the Next.js UI
+  # -------------------------------------------------------------------
+  # Built with LYRITHM_EDITION=personal at next build time (S3.3a):
+  # strips /sign-in, /sign-up, /pricing, /admin, /observatory; replaces
+  # Clerk auth with the local license identity from
+  # GET /api/v1/personal/identity. Single-tenant: every dashboard
+  # session is the local operator.
   dashboard:
-    image: ghcr.io/${GHCR_OWNER:-lyrithm-io}/lyrithm-dashboard-personal:${LYRITHM_VERSION:-1.1.0}
+    image: ghcr.io/${GHCR_OWNER:-lyrithm-io}/lyrithm-dashboard-personal:${LYRITHM_DASHBOARD_VERSION:-${LYRITHM_VERSION:-1.3.7}}
     container_name: lyrithm-personal-dashboard
     restart: unless-stopped
     depends_on:
       engine:
         condition: service_healthy
+    # Runtime proxy sends /api/v1/* to engine:8080.
+    # Port 3000 is published to host so the
+    # operator's browser can reach it.
     ports:
       - "127.0.0.1:3000:3000"
     environment:
@@ -140,6 +271,11 @@ services:
       - LYRITHM_EDITION=personal
 
 volumes:
+  redis_data:
   postgres_data:
+    # Named volume. Use `docker volume inspect lyrithm-core_postgres_data`
+    # to find the host path for backups.
   lyrithm_data:
+    # Activation marker, installation-id and Observatory cache; retain on upgrade.
   strategy_sources:
+    # Uploaded sources shared with the worker; retain on upgrade.

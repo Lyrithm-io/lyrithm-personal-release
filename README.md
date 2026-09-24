@@ -2,6 +2,10 @@
 
 Self-hosted Lyrithm trading bot for licensed Personal Edition buyers.
 
+> **Personal 1.3.7** includes persistent activation, Settings activation status,
+> Python strategy support and the complete backup/upgrade guide. Use the matching
+> engine, dashboard and worker images from this release.
+
 This repository contains the public release files needed to run Lyrithm Personal on your own machine or VPS. The Docker images are published on GitHub Container Registry; your `license.json` unlocks the edition and tier you purchased.
 
 ## Quick Start
@@ -10,8 +14,8 @@ This repository contains the public release files needed to run Lyrithm Personal
 mkdir -p ~/lyrithm-personal
 cd ~/lyrithm-personal
 
-curl -fsSLO https://raw.githubusercontent.com/Lyrithm-io/lyrithm-personal-release/v1.1.0/docker-compose.personal.yml
-curl -fsSLO https://raw.githubusercontent.com/Lyrithm-io/lyrithm-personal-release/v1.1.0/.env.personal.example
+curl -fsSLO https://raw.githubusercontent.com/Lyrithm-io/lyrithm-personal-release/v1.3.7/docker-compose.personal.yml
+curl -fsSLO https://raw.githubusercontent.com/Lyrithm-io/lyrithm-personal-release/v1.3.7/.env.personal.example
 cp .env.personal.example .env
 ```
 
@@ -34,11 +38,11 @@ Full walkthrough: [SETUP.personal.md](SETUP.personal.md)
 
 | Image | Tag | Visibility |
 | --- | --- | --- |
-| `ghcr.io/lyrithm-io/lyrithm-personal` | `1.1.0` | Public |
-| `ghcr.io/lyrithm-io/lyrithm-dashboard-personal` | `1.1.0` | Public |
-| `ghcr.io/lyrithm-io/lyrithm-strategy-worker-python` | `1.1.0` | Public |
+| `ghcr.io/lyrithm-io/lyrithm-personal` | `1.3.7` | Public |
+| `ghcr.io/lyrithm-io/lyrithm-dashboard-personal` | `1.3.7` | Public |
+| `ghcr.io/lyrithm-io/lyrithm-strategy-worker-python` | `1.3.7` | Public |
 
-Verified pull digests are added here after each release tag's GHCR build completes. v1.0.4 and v1.0.3 remain pullable for older buyers that have not upgraded; see [CHANGELOG.md](CHANGELOG.md) for the upgrade story.
+Verified multi-architecture manifest digests for this release are recorded in [IMAGE_DIGESTS.md](IMAGE_DIGESTS.md). v1.0.4 and v1.0.3 remain pullable for older buyers that have not upgraded; see [CHANGELOG.md](CHANGELOG.md) for the upgrade story.
 
 ```text
 # v1.0.4 (superseded by v1.1.0 for new installs)
@@ -56,12 +60,20 @@ sha256:8e83697d07632b7a14ff47d24e39e008d4309c1827c68f8a2c1f80447c2f7eb3
 
 ## What Is Included
 
-Lyrithm Personal runs as four local containers:
+The 1.3.7 stack runs five local services plus a one-shot `init-data`
+job that prepares persistent-volume permissions and the bundled open-source
+example before the non-root engine starts:
 
 - `lyrithm-personal-engine` - the trading engine
 - `lyrithm-personal-dashboard` - the local dashboard
 - `lyrithm-personal-strategy-worker-python` - the local gRPC Python strategy worker for Sandbox-uploaded strategies
 - `lyrithm-personal-postgres` - your local state database
+- `lyrithm-personal-redis` - persistent Binance cooldowns and request budgets
+
+Settings shows activation success, a fixed initial offline-grace deadline, and
+connection retry status. Keep the same Compose project and volumes on upgrade;
+see the [setup and recovery guide](SETUP.personal.md). Upgrades from the older
+four-service package retain the existing data and add persistent Redis.
 
 No Clerk, Stripe, or SaaS account is required for the local stack. Your signed `license.json` is the credential.
 
