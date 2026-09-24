@@ -28,7 +28,7 @@ services:
   # Older worker-first installs created the shared source volume as root,
   # so uploads failed even when all five long-running services were healthy.
   init-data:
-    image: ghcr.io/${GHCR_OWNER:-lyrithm-io}/lyrithm-personal:${LYRITHM_ENGINE_VERSION:-${LYRITHM_VERSION:-1.1.0}}
+    image: ghcr.io/${GHCR_OWNER:-lyrithm-io}/lyrithm-personal:${LYRITHM_ENGINE_VERSION:-${LYRITHM_VERSION:-1.3.7}}
     user: "0:0"
     restart: "no"
     network_mode: none
@@ -86,7 +86,7 @@ services:
       retries: 5
 
   strategy-worker-python:
-    image: ghcr.io/${GHCR_OWNER:-lyrithm-io}/lyrithm-strategy-worker-python:${LYRITHM_WORKER_VERSION:-${LYRITHM_VERSION:-1.1.0}}
+    image: ghcr.io/${GHCR_OWNER:-lyrithm-io}/lyrithm-strategy-worker-python:${LYRITHM_WORKER_VERSION:-${LYRITHM_VERSION:-1.3.7}}
     container_name: lyrithm-personal-strategy-worker-python
     restart: unless-stopped
     depends_on:
@@ -117,7 +117,7 @@ services:
   # the Cloud Observatory at runtime (Owner tier only, encrypted in
   # flight per spec 禮6 / S3.5).
   engine:
-    image: ghcr.io/${GHCR_OWNER:-lyrithm-io}/lyrithm-personal:${LYRITHM_ENGINE_VERSION:-${LYRITHM_VERSION:-1.1.0}}
+    image: ghcr.io/${GHCR_OWNER:-lyrithm-io}/lyrithm-personal:${LYRITHM_ENGINE_VERSION:-${LYRITHM_VERSION:-1.3.7}}
     container_name: lyrithm-personal-engine
     restart: unless-stopped
     # Pin DNS to public resolvers ??JDK17 dual-stack DNS lookup is flaky
@@ -155,7 +155,7 @@ services:
 
       # ----- Personal-edition profile activation -----
       - LYRITHM_EDITION=personal
-      - LYRITHM_VERSION=${LYRITHM_ENGINE_VERSION:-${LYRITHM_VERSION:-1.1.0}}
+      - LYRITHM_VERSION=${LYRITHM_ENGINE_VERSION:-${LYRITHM_VERSION:-1.3.7}}
       - LYRITHM_LICENSE_FILE=/etc/lyrithm/license.json
       - LYRITHM_ACTIVATED_FLAG=/var/lib/lyrithm/activated.flag
       - LYRITHM_STRATEGY_CACHE_DIR=/var/lib/lyrithm/strategies
@@ -254,7 +254,7 @@ services:
   # GET /api/v1/personal/identity. Single-tenant: every dashboard
   # session is the local operator.
   dashboard:
-    image: ghcr.io/${GHCR_OWNER:-lyrithm-io}/lyrithm-dashboard-personal:${LYRITHM_DASHBOARD_VERSION:-${LYRITHM_VERSION:-1.1.0}}
+    image: ghcr.io/${GHCR_OWNER:-lyrithm-io}/lyrithm-dashboard-personal:${LYRITHM_DASHBOARD_VERSION:-${LYRITHM_VERSION:-1.3.7}}
     container_name: lyrithm-personal-dashboard
     restart: unless-stopped
     depends_on:

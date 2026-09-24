@@ -14,7 +14,7 @@ with tempfile.TemporaryDirectory() as directory:
     empty_env = Path(directory) / "empty.env"
     empty_env.touch()
     for overrides, expected in [
-        ({}, ("1.1.0", "1.1.0", "1.1.0")),
+        ({}, ("1.3.7", "1.3.7", "1.3.7")),
         ({"LYRITHM_VERSION": "legacy-test"}, ("legacy-test",) * 3),
         (dict(zip(version_names, ("fallback-test", "engine-test", "dashboard-test", "worker-test"))),
          ("engine-test", "dashboard-test", "worker-test")),

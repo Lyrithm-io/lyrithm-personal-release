@@ -1,9 +1,8 @@
 # Lyrithm Personal Edition — Setup Guide
 
-> Next-release preparation, not a published release. The last public image set is
-> `1.1.0`. Automatic activation and the Settings activation card described below
-> require the forthcoming engine and dashboard images. Maintainers must replace
-> the version pins with the verified release tags before publishing this guide.
+> Personal **1.3.7** uses the matching engine, dashboard and Python worker
+> images. Download the complete package from the same release and retain your
+> existing secrets and persistent volumes when upgrading.
 
 ## Prepare the install
 
@@ -119,7 +118,7 @@ direct Telegram bot still requires an Internet connection and your own bot token
 
 ```dotenv
 # Legacy shared version remains the fallback for any unset component.
-LYRITHM_VERSION=1.1.0
+LYRITHM_VERSION=1.3.7
 # Override only with verified published tags from the release notes:
 # LYRITHM_ENGINE_VERSION=...
 # LYRITHM_DASHBOARD_VERSION=...

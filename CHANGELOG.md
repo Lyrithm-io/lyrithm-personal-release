@@ -2,7 +2,7 @@
 
 All notable Lyrithm Personal release changes are documented here.
 
-## Unreleased — Personal activation and buyer-flow acceptance
+## v1.3.7 - 2026-09-24 — Persistent activation and buyer workflows
 
 - Authenticated first activation with a persistent installation identity and a
   single 14-day grace window for temporary first-contact failures. Successful
@@ -24,7 +24,10 @@ All notable Lyrithm Personal release changes are documented here.
 - Pull requests validate Compose startup order, local bindings, persistent
   volumes, and legacy/independent image-version overrides.
 
-No new release tag or image pins have been published for these changes.
+This package pins engine, dashboard and Python worker to **1.3.7**.
+See [IMAGE_DIGESTS.md](IMAGE_DIGESTS.md) for the verified release manifests.
+No database migration is introduced by the activation/Jackson changes.
+Preserve your complete backup set when upgrading from the v1.1.0 package.
 
 ## v1.1.0 - 2026-06-03 — Stage-1 bidirectional channel: alert buttons live, Mini App support
 
